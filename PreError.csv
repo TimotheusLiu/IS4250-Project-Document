@@ -1,0 +1,18 @@
+Error,Error_Category,ControlX,ControlY,ControlZ,InterventA1,InterventB2,InterventB3
+Procedural Error,Legal,647,566,1312,392,123,1220
+Procedural Error,Incomplete order,548,462,1024,379,112,588
+Procedural Error,Unclear order ,115,82,276,85,26,268
+Clinical Error,Duplicated therapy ,86,76,156,56,20,156
+Clinical Error,Wrong strength ,42,42,120,48,1,51
+Clinical Error,Wrong dose/volume ,96,64,216,35,21,121
+Clinical Error,Wrong rate ,71,23,92,23,3,55
+Clinical Error,Wrong route ,34,40,100,20,28,64
+Clinical Error,Wrong drug ,23,15,76,14,0,43
+Clinical Error,Drug not prescribed ,45,37,144,9,1,137
+Clinical Error,Drug-drug interaction,12,6,36,8,1,83
+Clinical Error,Not indicated ,4,11,32,7,0,3
+Clinical Error,Wrong timing ,13,20,68,5,0,24
+Clinical Error,Wrong formulation ,0,13,4,4,0,3
+Clinical Error,Inadequate monitoring,4,3,16,4,1,8
+Clinical Error,Allergy ,4,6,16,4,0,15
+Clinical Error,Wrong patient ,0,0,0,1,0,0

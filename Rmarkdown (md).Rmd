@@ -1,0 +1,310 @@
+---
+title: "IS4250 Group 11 RMarkdown"
+author: "ZiGui"
+date: "31 March 2016"
+output: md_document
+---
+
+```{r.message=FALSE,echo=FALSE, r.eval=TRUE, r.warning=FALSE}
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(magrittr)
+library(sqldf)
+```
+
+---
+Reading Raw Data
+---
+```{r.message=FALSE,echo=FALSE}
+Num_adm <- read.csv("C:/Users/ZiGui/Desktop/Num_adm.csv")
+PostError <- read.csv("C:/Users/ZiGui/Desktop/PostError.csv")
+PreError <- read.csv("C:/Users/ZiGui/Desktop/PreError.csv")
+PostError.NoSystemErrors <- read.csv("C:/Users/ZiGui/Desktop/PostError.NoSystemErrors.csv")
+```
+
+###[Raw Data 1] Number of Admissions in Individual Wards
+```{r.message=FALSE,echo=FALSE}
+print(Num_adm)
+```
+###[Raw Data 2] Errors in Pre-Implementation Phase
+```{r.message=FALSE,echo=FALSE}
+print(PreError)
+```
+###[Raw Data 3] Errors in Post-Implementation Phase
+```{r.message=FALSE,echo=FALSE}
+print(PostError)
+```
+
+
+
+###[Pre] Data Summary
+```{r.message=FALSE,echo=TRUE}
+PreTemp <- with(PreError, aggregate(PreError[3:8], data.frame(Error), sum))
+PreTemp <- t(PreTemp)
+colnames(PreTemp) = PreTemp[1, ]
+PreTemp = PreTemp[-1, ]
+
+PreTemp <- cbind(Ward = rownames(PreTemp), PreTemp)
+rownames(PreTemp) <- NULL
+PreTemp <- inner_join(Num_adm, PreTemp, by="Ward", copy=TRUE)
+
+PreTemp$Post <- NULL
+PreTemp$`Procedural Error`= as.numeric(as.character(PreTemp$`Procedural Error`))
+PreTemp$`Clinical Error`= as.numeric(as.character(PreTemp$`Clinical Error`))
+PreTemp$Mean_PreProError = PreTemp$`Procedural Error`/PreTemp$Pre
+PreTemp$Mean_PreCliError = PreTemp$`Clinical Error`/PreTemp$Pre
+names(PreTemp)[names(PreTemp) == 'Procedural Error'] <- 'PreProceduralError'
+names(PreTemp)[names(PreTemp) == 'Clinical Error'] <- 'PreClinicalError'
+print(PreTemp)
+```
+
+
+
+###[Post] Data Summary
+```{r.message=FALSE,echo=FALSE}
+PostTemp <- with(PostError, aggregate(PostError[3:8], data.frame(Error), sum))
+PostTemp <- t(PostTemp)
+colnames(PostTemp) = PostTemp[1, ]
+PostTemp = PostTemp[-1, ]
+
+PostTemp <- cbind(Ward = rownames(PostTemp), PostTemp)
+rownames(PostTemp) <- NULL
+PostTemp <- inner_join(Num_adm, PostTemp, by="Ward", copy=TRUE)
+
+PostTemp$Pre <- NULL
+PostTemp$`Procedural Error`= as.numeric(as.character(PostTemp$`Procedural Error`))
+PostTemp$`Clinical Error`= as.numeric(as.character(PostTemp$`Clinical Error`))
+PostTemp$Mean_PostProError = PostTemp$`Procedural Error`/PostTemp$Post
+PostTemp$Mean_PostCliError = PostTemp$`Clinical Error`/PostTemp$Post
+names(PostTemp)[names(PostTemp) == 'Procedural Error'] <- 'PostProceduralError'
+names(PostTemp)[names(PostTemp) == 'Clinical Error'] <- 'PostClinicalError'
+print(PostTemp)
+```
+
+
+
+###[Barplot] Error Summary (Pre vs Post)
+```{r.message=FALSE, r.echo=FALSE}
+Temp <- inner_join(PreTemp, PostTemp, by="Ward", copy=TRUE)
+Temp$Pre <- NULL
+Temp$Post <- NULL
+Temp$Mean_PreProError <- NULL
+Temp$Mean_PreCliError <- NULL
+Temp$Mean_PostProError <- NULL
+Temp$Mean_PostCliError <- NULL
+rownames(Temp) = Temp[,1]
+
+Temp <- t(Temp)
+for (i in 1:6) {
+    if (grepl("Control", Temp[1,i])>0)   Temp[1,i] <- "Control"
+    else                                  Temp[1,i] <- "Intervent"
+}
+Temp <- t(Temp)
+Temp <- as.data.frame(Temp)
+rownames(Temp) <- NULL
+Temp <- sqldf('Select Ward, sum(PreClinicalError), sum(PreProceduralError), 
+              sum(PostClinicalError), sum(PostProceduralError) From Temp Group By Ward')
+Temp <- Temp[rep(1:nrow(Temp),each=2),]
+Temp <- t(Temp)
+colnames(Temp) = Temp[1,]
+Temp = Temp[-1,]
+
+
+for (j in 1:2) { Temp[1,2*j] <- Temp[3,2*j] }
+for (k in 1:2) { Temp[2,2*k] <- Temp[4,2*k] }
+Temp <- Temp[-c(3,4),]
+row.names(Temp) <- c("Clinical Error", "Procedural Error")
+
+bp <- barplot(Temp,space=c(1,0), col=c('red','blue'),xaxt="n", las=1, 
+              main="Errors Summary (Control Wards vs Intervention Wards)", 
+              xlab="Wards", ylab="Number of Errors", ylim=c(0, 7000))
+axis(1,at=rowMeans(matrix(bp,ncol=2,byrow=TRUE)), labels=unique(colnames(Temp)),lty=0)
+legend("topright", inset=.05, fill=c("red","blue"), c(rownames(Temp)), horiz=FALSE)
+```
+
+
+
+###[Table] %Drop in Error Rates
+```{r.message=FALSE, r.echo=FALSE, r.include=FALSE}
+Temp <- inner_join(PreTemp, PostTemp, by="Ward", copy=TRUE)
+Temp$Pre <- NULL
+Temp$Post <- NULL
+Temp$Mean_PreProError <- NULL
+Temp$Mean_PreCliError <- NULL
+Temp$Mean_PostProError <- NULL
+Temp$Mean_PostCliError <- NULL
+rownames(Temp) = Temp[,1]
+
+Temp <- t(Temp)
+for (i in 1:6) {
+    if (grepl("Control", Temp[1,i])>0)   Temp[1,i] <- "Control"
+    else                                  Temp[1,i] <- "Intervent"
+}
+Temp <- t(Temp)
+Temp <- as.data.frame(Temp)
+rownames(Temp) <- NULL
+Temp <- sqldf('Select Ward, sum(PreClinicalError), sum(PreProceduralError), sum(PostClinicalError), sum(PostProceduralError)
+                  From Temp Group By Ward')
+Temp$`SumPreErrors` = Temp$`sum(PreClinicalError)` + Temp$`sum(PreProceduralError)`
+Temp$`SumPostErrors` = Temp$`sum(PostClinicalError)` + Temp$`sum(PostProceduralError)`
+Temp$`%dropInP` <- (Temp$`sum(PreProceduralError)`-Temp$`sum(PostProceduralError)`)/Temp$`sum(PreProceduralError)`*100
+Temp$`%dropInC` <- (Temp$`sum(PreClinicalError)`-Temp$`sum(PostClinicalError)`)/Temp$`sum(PreClinicalError)`*100
+Temp$`%drop` <- ( (Temp$`sum(PreProceduralError)`+Temp$`sum(PreClinicalError)`)
+                  - (Temp$`sum(PostProceduralError)`+Temp$`sum(PostClinicalError)`) ) /
+                  (Temp$`sum(PreProceduralError)`+Temp$`sum(PreClinicalError)`)*100
+print(Temp)
+```
+
+
+
+###[Barplot] Number of Errors (Individual Wards)
+```{r.message=FALSE, r.echo=FALSE}
+Temp <- inner_join(PreTemp, PostTemp, by="Ward", copy=TRUE)
+Temp$Pre <- NULL
+Temp$Post <- NULL
+Temp$Mean_PreProError <- NULL
+Temp$Mean_PreCliError <- NULL
+Temp$Mean_PostProError <- NULL
+Temp$Mean_PostCliError <- NULL
+
+Temp <- Temp[rep(1:nrow(Temp),each=2),]
+Temp <- t(Temp)
+colnames(Temp) = Temp[1,]
+Temp = Temp[-1,]
+
+for (i in 1:6) { Temp[1,2*i] <- Temp[3,2*i] }
+for (i in 1:6) { Temp[2,2*i] <- Temp[4,2*i] }
+Temp <- Temp[-c(3,4),]
+row.names(Temp) <- c("Clinical Error", "Procedural Error")
+
+bp <- barplot(Temp,space=c(1,0), col=c('red','blue'),xaxt="n", las=1, ylim=c(0,4000),
+              cex.lab=1.25, main="Error Summary (Individual Wards)", xlab="Wards", ylab="Number of Errors")
+
+axis(1,at=rowMeans(matrix(bp,ncol=2,byrow=TRUE)), 
+     labels=c("ConX", "ConY", "ConZ", "InterA1", "InterB2", "InterB3"),lty=0)
+legend("topright", inset=.01, fill=c("red","blue"), c(rownames(Temp)), horiz=FALSE)
+```
+
+
+
+###[Table] Drop in Error Rates (Individual Wards)
+```{r.message=FALSE, r.echo=FALSE}
+Temp <- inner_join(PreTemp, PostTemp, by="Ward", copy=TRUE)
+Temp$Pre <- NULL
+Temp$Post <- NULL
+Temp$Mean_PreProError <- NULL
+Temp$Mean_PreCliError <- NULL
+Temp$Mean_PostProError <- NULL
+Temp$Mean_PostCliError <- NULL
+
+Temp$sumPreErrors <- Temp$PreClinicalError + Temp$PreProceduralError
+Temp$sumPostErrors <- Temp$PostClinicalError + Temp$PostProceduralError
+
+Temp$`%dropInP` <- (Temp$`PreProceduralError`-Temp$`PostProceduralError`)/Temp$`PreProceduralError`*100
+Temp$`%dropInC` <- (Temp$`PreClinicalError`-Temp$`PostClinicalError`)/Temp$`PreClinicalError`*100
+Temp$`%drop` <- ( (Temp$`PreProceduralError`+Temp$`PreClinicalError`)
+                  - (Temp$`PostClinicalError`+Temp$`PostClinicalError`) ) /
+                  (Temp$`PreProceduralError`+Temp$`PreClinicalError`)*100
+print(Temp)
+```
+
+
+
+###[Pie Chart] System-Related Errors
+```{r.message=FALSE, r.echo=FALSE}
+PostTemp$TotalPostError = PostTemp$`PostProceduralError` + PostTemp$`PostClinicalError`
+PieCompute <- sqldf('Select Sum(TotalPostError) from PostTemp where Ward Like "%Intervent%"')
+slices <- c(PieCompute$`Sum(TotalPostError)`, 358)
+lbl <- c("Non System-Related", "System-Related")
+pct <- round(slices/sum(slices) * 100)
+lbl <- paste(lbl, pct)
+lbl <- paste(lbl, "%", sep = "")
+lbl <- paste(lbl, " [", slices, "]")
+pie(slices, labels = lbl, col=rainbow(length(lbl)), main = "Errors in Intervention Wards")
+```
+
+
+###[Table] Removing System-related Errors
+```{r.message=FALSE, r.echo=FALSE}
+PostTempNoSysErr <- with(PostError.NoSystemErrors, aggregate(PostError.NoSystemErrors[3:8], data.frame(Error), sum))
+PostTempNoSysErr <- t(PostTempNoSysErr)
+colnames(PostTempNoSysErr) = PostTempNoSysErr[1, ]
+PostTempNoSysErr = PostTempNoSysErr[-1, ]
+
+PostTempNoSysErr <- cbind(Ward = rownames(PostTempNoSysErr), PostTempNoSysErr)
+rownames(PostTempNoSysErr) <- NULL
+PostTempNoSysErr <- inner_join(Num_adm, PostTempNoSysErr, by="Ward", copy=TRUE)
+
+PostTempNoSysErr$Pre <- NULL
+PostTempNoSysErr$`Procedural Error`= as.numeric(as.character(PostTempNoSysErr$`Procedural Error`))
+PostTempNoSysErr$`Clinical Error`= as.numeric(as.character(PostTempNoSysErr$`Clinical Error`))
+PostTempNoSysErr$Mean_PostProError = PostTempNoSysErr$`Procedural Error`/PostTempNoSysErr$Post
+PostTempNoSysErr$Mean_PostCliError = PostTempNoSysErr$`Clinical Error`/PostTempNoSysErr$Post
+names(PostTempNoSysErr)[names(PostTempNoSysErr) == 'Procedural Error'] <- 'PostProceduralError'
+names(PostTempNoSysErr)[names(PostTempNoSysErr) == 'Clinical Error'] <- 'PostClinicalError'
+
+Temp <- inner_join(PreTemp, PostTempNoSysErr, by="Ward", copy=TRUE)
+Temp$Pre <- NULL
+Temp$Post <- NULL
+# Temp$Mean_PreProError <- NULL
+# Temp$Mean_PreCliError <- NULL
+# Temp$Mean_PostProError <- NULL
+# Temp$Mean_PostCliError <- NULL
+
+Temp$sumPreErrors <- Temp$PreClinicalError + Temp$PreProceduralError
+Temp$sumPostErrors <- Temp$PostClinicalError + Temp$PostProceduralError
+
+Temp$`%dropInP` <- (Temp$`PreProceduralError`-Temp$`PostProceduralError`)/Temp$`PreProceduralError`*100
+Temp$`%dropInC` <- (Temp$`PreClinicalError`-Temp$`PostClinicalError`)/Temp$`PreClinicalError`*100
+Temp$`%drop` <- ( (Temp$`PreProceduralError`+Temp$`PreClinicalError`)
+                  - (Temp$`PostClinicalError`+Temp$`PostClinicalError`) ) /
+                  (Temp$`PreProceduralError`+Temp$`PreClinicalError`)*100
+print(Temp)
+```
+
+
+# Significance of Mean for Intervention Wards
+```{r.message=FALSE, r.echo=FALSE}
+MeanTemp <- inner_join(PreTemp, PostTemp, by="Ward", copy=TRUE)
+MeanTemp <- sqldf('Select * From MeanTemp Where Ward Like "%Intervent%"')
+MeanTemp$Pre <- NULL
+MeanTemp$Post <- NULL
+MeanTemp$sumPreError <- MeanTemp$PreClinicalError + MeanTemp$PreProceduralError
+MeanTemp$sumPostError <- MeanTemp$PostClinicalError + MeanTemp$PostProceduralError
+MeanTemp$MeanPreError <- MeanTemp$Mean_PreProError + MeanTemp$Mean_PreCliError
+MeanTemp$Mean_PostError <- MeanTemp$Mean_PostProError + MeanTemp$Mean_PostCliError
+
+pvalueTable <- matrix(ncol=4,nrow=3, byrow=TRUE)
+colnames(pvalueTable) <- c("Ward", "C.pvalue", "P.pvalue", "T.pvalue" )
+
+for (i in 1:nrow(MeanTemp)) {
+  
+  if (i==1) Ward <- "InterventA1"
+  if (i==2) Ward <- "InterventB2"
+  if (i==3) Ward <- "InterventB3"
+  
+  #Clinical p-value
+  Control <- rnorm(MeanTemp[i,2], MeanTemp[i,5], 2)
+  Treat <- rnorm(MeanTemp[i,6], MeanTemp[i,9], 2)
+  resultsClinical <- t.test(Control, Treat, alternative = "two.sided")
+  #print(resultsClinical$`p.value`)
+  
+  #Procedural p-value
+  Control <- rnorm(MeanTemp[i,3], MeanTemp[i,4], 2)
+  Treat <- rnorm(MeanTemp[i,7], MeanTemp[i,8], 2)
+  resultsProcedural <- t.test(Control, Treat, alternative = "two.sided")
+  #print(resultsProcedural$`p.value`)
+  
+  #Total Error p-value
+  Control <- rnorm(MeanTemp[i,10], MeanTemp[i,12], 2)
+  Treat <- rnorm(MeanTemp[i,11], MeanTemp[i,13], 2)
+  resultsTotal <- t.test(Control, Treat, alternative = "two.sided")
+  #print(resultsTotal$`p.value`)
+
+  pvalueTable[i,] <- c(Ward, resultsClinical$`p.value`, resultsProcedural$`p.value`, resultsTotal$`p.value`)
+}
+  print(pvalueTable)
+
+
+```
